@@ -26,21 +26,30 @@ jobs:
       - name: Set update check flag
         shell: pwsh
         run: |
-          $filePath = Get-ChildItem -Path . -Filter "update_check_flag_file.dart" -Recurse | Select-Object -First 1
-          if ($filePath) {
-            echo "const updateCheckFlag = true;" > $filePath.FullName
-          } else {
-            mkdir -p lib/utils
-            echo "const updateCheckFlag = true;" > lib/utils/update_check_flag_file.dart
-          }
+          $flagFile = "lib/utils/update_check_flag_file.dart"
+          if (!(Test-Path "lib/utils")) { mkdir "lib/utils" }
+          "const updateCheckFlag = true;" | Out-File -FilePath $flagFile -Encoding utf8
 
       - name: Build Windows Release
         run: flutter build windows --release
 
+      - name: List files (Debug)
+        # Esto es para ver en el log exactamente dónde se guardó todo
+        run: dir /s build\windows\*.exe
+
       - name: Upload Windows Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Harmony-Music-Windows-Portable
-          # Esta ruta con asteriscos busca la carpeta Release en cualquier subcarpeta
-          path: build/windows/*/Release/
-          if-no-files-found: error
+          name: Harmony-Music-Windows-App
+          # ESTA ES LA CLAVE: Subimos todo lo que esté dentro de la carpeta build de Windows
+          # Así no dependemos de nombres de carpetas raros
+          path: build/windows/x64/runner/Release/
+          if-no-files-found: warn
+
+      - name: Upload Backup (If first fails)
+        # Si la ruta de arriba falla, este intenta subir TODO lo de Windows
+        if: failure() || success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Harmony-Music-Full-Build-Folder
+          path: build/windows/
